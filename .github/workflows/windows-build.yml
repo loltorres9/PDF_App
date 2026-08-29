@@ -1,0 +1,127 @@
+# Baut PDF-Merger.exe und den Installer auf einem echten Windows-Rechner und
+# haengt beide an ein GitHub-Release. Bei einem Pull Request wird nur gebaut
+# und als Artefakt angehaengt - veroeffentlicht wird ausschliesslich von main
+# oder von einem Tag aus.
+name: Windows-Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Tests
+        run: python test_pdfmerge_core.py
+
+      - name: Version ermitteln
+        id: ver
+        shell: bash
+        run: echo "version=$(python -c 'import pdfmerge_core; print(pdfmerge_core.__version__)')" >> "$GITHUB_OUTPUT"
+
+      - name: Exe bauen
+        run: |
+          python make_version_file.py
+          pyinstaller --noconfirm --clean --onefile --windowed `
+            --name "PDF-Merger" `
+            --icon app.ico `
+            --add-data "app.ico;." `
+            --version-file version_info.txt `
+            --collect-submodules pypdf `
+            pdfmerge.py
+
+      - name: Exe startet ueberhaupt
+        # Ein --windowed-Build meldet Importfehler nicht auf der Konsole, sondern
+        # nur in einem Fenster, das hier niemand sieht. Deshalb wird die gepackte
+        # Anwendung einmal gestartet und nach ein paar Sekunden geprueft, ob sie
+        # noch laeuft - ein Absturz beim Start faellt so trotzdem auf.
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\PDF-Merger.exe" -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) {
+            Write-Error "Die Exe hat sich nach $($p.ExitTime - $p.StartTime) wieder beendet (Code $($p.ExitCode))."
+            exit 1
+          }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Die Exe laeuft."
+
+      - name: Installer bauen
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          }
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Exe als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Merger-exe
+          path: dist/PDF-Merger.exe
+          if-no-files-found: error
+
+      - name: Installer als Artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-Merger-Setup
+          path: installer_out/PDF-Merger-Setup.exe
+          if-no-files-found: error
+
+      - name: Release veroeffentlichen
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Ein fehlschlagendes Kommando soll hier selbst ausgewertet werden -
+          # "gh release view" antwortet mit einem Fehler, wenn es das Release
+          # noch nicht gibt, und genau das ist der Normalfall.
+          $ErrorActionPreference = "Continue"
+          $PSNativeCommandUseErrorActionPreference = $false
+
+          $tag = if ("${{ github.ref_type }}" -eq "tag") {
+            "${{ github.ref_name }}"
+          } else {
+            "v${{ steps.ver.outputs.version }}"
+          }
+          $files = @("dist\PDF-Merger.exe", "installer_out\PDF-Merger-Setup.exe")
+
+          (Get-Content ".github/release_notes.md" -Raw).Replace("{TAG}", $tag) |
+            Set-Content -Path "release_notes_final.md" -Encoding utf8
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # Dieselbe Version erneut gebaut: Dateien ersetzen statt ein
+            # zweites Release danebenzustellen.
+            gh release upload $tag $files --clobber
+          } else {
+            gh release create $tag $files --title "PDF-Merger $tag" --notes-file "release_notes_final.md"
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Release $tag veroeffentlicht."

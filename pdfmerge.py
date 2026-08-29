@@ -19,6 +19,7 @@ from pdfmerge_core import (
     PasswordRequired,
     PdfItem,
     PdfMergeError,
+    __version__,
     inspect,
     merge,
     parse_page_spec,
@@ -27,6 +28,16 @@ from pdfmerge_core import (
 
 APP_NAME = "PDF-Merger"
 PDF_TYPES = [("PDF-Dateien", "*.pdf"), ("Alle Dateien", "*.*")]
+
+
+def _resource_path(name: str) -> str:
+    """Pfad zu einer mitgelieferten Datei — im Quellbaum wie in der gebauten Exe.
+
+    PyInstaller packt die Zusatzdateien beim Start in ein temporäres Verzeichnis
+    aus und hinterlegt dessen Pfad in ``sys._MEIPASS``.
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, name)
 
 
 def _enable_dpi_awareness() -> None:
@@ -64,7 +75,8 @@ class MergerApp(ttk.Frame):
     # ------------------------------------------------------------------ Aufbau
 
     def _build(self) -> None:
-        self.master.title(APP_NAME)
+        self.master.title(f"{APP_NAME} {__version__}")
+        self._set_window_icon()
         self.master.minsize(700, 420)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -128,6 +140,18 @@ class MergerApp(ttk.Frame):
 
         self._enable_explorer_drop()
         self._update_status()
+
+    def _set_window_icon(self) -> None:
+        """Fenster- und Taskleistensymbol. Fehlt die Datei, bleibt es beim Standard."""
+        try:
+            if sys.platform == "win32":
+                self.master.iconbitmap(default=_resource_path("app.ico"))
+            else:
+                image = tk.PhotoImage(file=_resource_path("app.png"))
+                self.master.iconphoto(True, image)
+                self._icon = image  # sonst gibt der Garbage Collector das Bild frei
+        except Exception:
+            pass
 
     def _enable_explorer_drop(self) -> None:
         """Dateien aus dem Explorer ins Fenster ziehen — falls tkinterdnd2 da ist.

@@ -3,10 +3,26 @@
 Ein kleines Windows-Programm, um mehrere PDF-Dateien auszuwählen, die
 Reihenfolge festzulegen und sie zu einer Datei zusammenzufügen.
 
-Es braucht außer Python nur `pypdf`, hat keinen Build-Schritt und lässt sich
-als einzelne `.exe` weitergeben.
+![Das Fenster mit einer Dateiliste](docs/screenshot.png)
 
-## Schnellstart
+*Aufnahme aus dem automatischen Test unter Linux — die Anordnung ist dieselbe,
+unter Windows zeichnet Tk die Bedienelemente im System-Look.*
+
+## Herunterladen
+
+Fertige Dateien liegen unter
+[**Releases**](https://github.com/loltorres9/PDF_App/releases) — Python wird auf
+dem Zielrechner nicht gebraucht:
+
+| Datei | Wofür |
+|---|---|
+| `PDF-Merger-Setup.exe` | Installer: Startmenü-Eintrag, auf Wunsch Desktop-Symbol und ein Eintrag unter *Senden an*. Nur für den angemeldeten Benutzer, ohne Administratorrechte |
+| `PDF-Merger.exe` | Das Programm als einzelne Datei, ganz ohne Installation |
+
+Beim ersten Start meldet sich unter Umständen Windows SmartScreen, weil die
+Datei nicht signiert ist: *Weitere Informationen* → *Trotzdem ausführen*.
+
+## Aus dem Quellcode starten
 
 ```bat
 pip install -r requirements.txt
@@ -16,18 +32,24 @@ python pdfmerge.py
 Oder per Doppelklick auf **`start.bat`** (installiert die Abhängigkeit beim
 ersten Mal selbst und startet das Fenster ohne Konsole).
 
-Dateien lassen sich auch direkt mitgeben — praktisch für „Senden an“ im
-Explorer, siehe unten:
+Dateien lassen sich auch direkt mitgeben — genau das nutzt der „Senden
+an“-Eintrag:
 
 ```bat
 python pdfmerge.py a.pdf b.pdf
 ```
 
-## Als .exe (ohne Python auf dem Zielrechner)
+## Selbst bauen
 
-Doppelklick auf **`build.bat`**. Danach liegt in `dist\` eine einzelne Datei
-`PDF-Merger.exe`, die sich weitergeben lässt. Der Build braucht einmalig
-Internet (PyInstaller + pypdf).
+Doppelklick auf **`build.bat`**: baut `dist\PDF-Merger.exe` und, wenn
+[Inno Setup](https://jrsoftware.org/isdl.php) installiert ist, zusätzlich
+`installer_out\PDF-Merger-Setup.exe`. Der Build braucht einmalig Internet
+(PyInstaller + pypdf).
+
+Dasselbe macht der Workflow `.github/workflows/windows-build.yml` bei jedem
+Push auf `main` auf einem Windows-Rechner von GitHub und hängt das Ergebnis an
+ein Release. Die Version steht **nur** in `pdfmerge_core.__version__`; Exe-
+Eigenschaften, Installer und Release-Tag lesen sie von dort.
 
 ## Bedienung
 
@@ -88,9 +110,10 @@ Paket ändert sich sonst nichts.
 
 ### „Senden an“-Verknüpfung im Explorer
 
-`Win+R` → `shell:sendto` → dort eine Verknüpfung auf `PDF-Merger.exe`
-(oder auf `start.bat`) ablegen. Danach lassen sich markierte PDFs im Explorer
-per Rechtsklick → *Senden an* direkt in die Liste laden.
+Der Installer legt sie auf Wunsch selbst an. Von Hand: `Win+R` →
+`shell:sendto` → dort eine Verknüpfung auf `PDF-Merger.exe` (oder auf
+`start.bat`) ablegen. Danach lassen sich markierte PDFs im Explorer per
+Rechtsklick → *Senden an* direkt in die Liste laden.
 
 ## Wie es aufgebaut ist
 
@@ -100,6 +123,9 @@ per Rechtsklick → *Senden an* direkt in die Liste laden.
 | `pdfmerge.py` | Die Oberfläche (Tkinter) — Liste, Reihenfolge, Dialoge |
 | `test_pdfmerge_core.py` | Tests der Logik, laufen ohne Bildschirm |
 | `build.bat` / `start.bat` | Exe bauen / direkt starten |
+| `installer.iss` | Inno-Setup-Skript für `PDF-Merger-Setup.exe` |
+| `make_icon.py` / `app.ico` | Bauplan des Symbols und das fertige Symbol |
+| `make_version_file.py` | Schreibt die Exe-Eigenschaften aus `__version__` |
 
 Diese Trennung ist der Grund, warum sich die Logik überhaupt testen lässt:
 Tkinter braucht einen Bildschirm, `pdfmerge_core` nicht.
