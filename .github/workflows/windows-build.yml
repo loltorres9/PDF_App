@@ -112,13 +112,35 @@ jobs:
           }
           $files = @("dist\PDF-Merger.exe", "installer_out\PDF-Merger-Setup.exe")
 
-          (Get-Content ".github/release_notes.md" -Raw).Replace("{TAG}", $tag) |
-            Set-Content -Path "release_notes_final.md" -Encoding utf8
+          # Pruefsummen aus genau diesen Dateien - unsigniert heruntergeladene
+          # Programme sollte man wenigstens nachrechnen koennen.
+          # Einfache Anfuehrungszeichen, weil das Backtick in PowerShell sonst
+          # als Escape-Zeichen gilt und die Tabelle zerlegt.
+          $rows = @()
+          $sums = @()
+          foreach ($file in $files) {
+            $name = Split-Path $file -Leaf
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+            $rows += '| `' + $name + '` | `' + $hash + '` |'
+            $sums += $hash + '  ' + $name
+          }
+          $sums | Set-Content -Path "SHA256SUMS.txt" -Encoding ascii
+          $files += "SHA256SUMS.txt"
+
+          # Bewusst Schritt fuer Schritt statt als Methodenkette ueber mehrere
+          # Zeilen - die haengt in PowerShell von der Version ab.
+          $notes = Get-Content ".github/release_notes.md" -Raw
+          $notes = $notes.Replace("{TAG}", $tag)
+          $notes = $notes.Replace("{HASHES}", ($rows -join "`n"))
+          Set-Content -Path "release_notes_final.md" -Value $notes -Encoding utf8
 
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             # Dieselbe Version erneut gebaut: Dateien ersetzen statt ein
-            # zweites Release danebenzustellen.
+            # zweites Release danebenzustellen. Die Notizen muessen mit, sonst
+            # nennen sie die Pruefsummen des vorherigen Builds.
+            gh release edit $tag --notes-file "release_notes_final.md"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             gh release upload $tag $files --clobber
           } else {
             gh release create $tag $files --title "PDF-Merger $tag" --notes-file "release_notes_final.md"
