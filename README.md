@@ -16,11 +16,38 @@ dem Zielrechner nicht gebraucht:
 
 | Datei | Wofür |
 |---|---|
-| `PDF-Merger-Setup.exe` | Installer: Startmenü-Eintrag, auf Wunsch Desktop-Symbol und ein Eintrag unter *Senden an*. Nur für den angemeldeten Benutzer, ohne Administratorrechte |
+| **`PDF-Merger-Setup.exe`** | **Empfohlen.** Installer: Startmenü-Eintrag, auf Wunsch Desktop-Symbol und ein Eintrag unter *Senden an*. Nur für den angemeldeten Benutzer, ohne Administratorrechte |
 | `PDF-Merger.exe` | Das Programm als einzelne Datei, ganz ohne Installation |
+| `SHA256SUMS.txt` | Prüfsummen der beiden Dateien aus demselben Build |
 
-Beim ersten Start meldet sich unter Umständen Windows SmartScreen, weil die
-Datei nicht signiert ist: *Weitere Informationen* → *Trotzdem ausführen*.
+### Windows warnt — warum, und was zu tun ist
+
+Beide Dateien sind **nicht signiert**: ein Code-Signing-Zertifikat kostet
+mehrere hundert Euro im Jahr. Zusätzlich kennt SmartScreen jede frisch
+veröffentlichte Datei erst einmal nicht. Die Warnungen sagen deshalb nichts
+darüber aus, was in der Datei steckt — sie erscheinen bei jedem unsignierten
+Programm.
+
+1. **Beim Herunterladen** („wird nicht häufig heruntergeladen"):
+   im Download-Menü *Beibehalten* → *Trotzdem beibehalten*.
+2. **Beim ersten Start** („Der Computer wurde durch Windows geschützt"):
+   *Weitere Informationen* → *Trotzdem ausführen*.
+3. **Oder vorher entsperren:** Rechtsklick → *Eigenschaften* → *Zulassen*
+   ankreuzen → *OK*. In PowerShell: `Unblock-File .\PDF-Merger-Setup.exe`.
+
+Nachrechnen statt vertrauen — die Werte stehen in den Release-Notizen und in
+`SHA256SUMS.txt`, erzeugt vom selben Build, der die Dateien gepackt hat:
+
+```powershell
+Get-FileHash .\PDF-Merger-Setup.exe -Algorithm SHA256
+```
+
+Wer die Warnung ganz loswerden will, kommt an einer Signatur nicht vorbei:
+ein gekauftes Zertifikat (bei EV sofort wirksam, bei OV erst mit wachsender
+Download-Reputation), [Azure Artifact Signing](https://azure.microsoft.com/en-us/products/artifact-signing)
+für Organisationen, oder [SignPath Foundation](https://signpath.io/solutions/open-source-community),
+das Open-Source-Projekte kostenlos signiert. Ein selbst erstelltes Zertifikat
+hilft **nicht** — SmartScreen ignoriert es.
 
 ## Aus dem Quellcode starten
 

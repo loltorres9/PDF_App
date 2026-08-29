@@ -5,3 +5,4 @@ installer_out/
 *.spec
 version_info.txt
 release_notes_final.md
+SHA256SUMS.txt
