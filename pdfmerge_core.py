@@ -13,6 +13,10 @@ from typing import Callable, Iterable, Sequence
 from pypdf import PdfReader, PdfWriter
 from pypdf.errors import PdfReadError
 
+#: Eine Quelle für alles: Fenstertitel, Exe-Eigenschaften und Installer lesen
+#: die Version hierher zurück, damit sie nicht dreifach gepflegt werden muss.
+__version__ = "1.0.0"
+
 
 class PdfMergeError(Exception):
     """Ein Fehler, der dem Benutzer wörtlich angezeigt werden kann."""
